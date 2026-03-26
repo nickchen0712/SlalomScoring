@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Freestyle Slalom 裁判評分登錄系統</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background-color: #f0f2f5; font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif; touch-action: manipulation; }
+    .setup-card { max-width: 450px; margin: 50px auto; border: none; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+    .score-card { max-width: 500px; margin: 20px auto; border-radius: 20px; border: none; box-shadow: 0 15px 35px rgba(0,0,0,0.15); overflow: hidden; }
+    .skater-info { background: linear-gradient(135deg, #0d6efd, #0dcaf0); color: white; padding: 25px; text-align: center; position: relative; }
+    .btn-back { position: absolute; top: 15px; left: 15px; background: rgba(0,0,0,0.2); border: none; color: white; }
+    .input-label { font-weight: bold; color: #495057; margin-top: 10px; display: block; font-size: 1.1rem; }
+    .score-input { font-size: 2.5rem; text-align: center; font-weight: 800; color: #0d6efd; height: 80px; border-radius: 12px; transition: all 0.2s; }
+    .score-input:focus { border-color: #0d6efd; box-shadow: 0 0 0 0.3rem rgba(13, 110, 253, 0.25); background-color: #f8fbff; }
+    .penalty-section { background-color: #fff5f5; border-radius: 12px; padding: 15px; margin-top: 25px; border: 1px dashed #dc3545; position: relative; }
+    .penalty-input { font-size: 1.5rem; height: 50px; color: #dc3545 !important; }
+    .btn-nav { padding: 15px 25px; font-weight: bold; border-radius: 12px; font-size: 1.2rem; }
+    .fade-in { animation: fadeIn 0.3s ease-in; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  </style>
+</head>
+<body class="p-3">
+
+  <div id="setupView" class="container text-center py-4 fade-in">
+    <div class="card setup-card">
+      <div class="card-header text-white py-3" style="background: linear-gradient(135deg, #0d6efd, #0dcaf0); border-radius: 20px 20px 0 0; position: relative;">
+        <button class="btn btn-sm btn-back" onclick="window.location.href='index.html'">🔙 首頁</button>
+        <h4 class="mb-0 fw-bold">📋 裁判評分登錄系統</h4>
+      </div>
+      <div class="card-body p-4 text-start">
+        <div class="mb-3">
+          <label class="form-label fw-bold">1. 選擇賽事</label>
+          <select id="compSelect" class="form-select form-select-lg" onchange="loadCategories()">
+            <option value="">-- 讀取賽事中... --</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">2. 選擇組別</label>
+          <select id="catSelect" class="form-select form-select-lg" disabled onchange="checkEntryReady()">
+            <option value="">-- 請先選擇賽事 --</option>
+          </select>
+        </div>
+        <div class="mb-4">
+          <label class="form-label fw-bold">3. 您的裁判編號</label>
+          <select id="judgeId" class="form-select form-select-lg">
+            <option value="J1">第 1 位裁判 (J1)</option>
+            <option value="J2">第 2 位裁判 (J2)</option>
+            <option value="J3">第 3 位裁判 (J3)</option>
+            <option value="J4">第 4 位裁判 (J4)</option>
+            <option value="J5">第 5 位裁判 (J5)</option>
+          </select>
+        </div>
+        <button id="entryBtn" class="btn btn-primary w-100 btn-lg shadow fw-bold" onclick="startScoring()" disabled>
+          進入評分系統
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="scoringView" class="container d-none fade-in">
+    <div class="card score-card mx-auto">
+      <div class="skater-info position-relative">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <div id="currentSkaterNum" class="badge bg-light text-dark px-3 py-2" style="font-size: 1rem;">選手 -- / --</div>
+          <select id="jumpSelect" class="form-select form-select-sm shadow-sm" style="width: 150px; font-weight: bold; cursor: pointer; color: #212529;" onchange="jumpToSkater()">
+          </select>
+        </div>
+        <h1 id="currentSkaterName" class="display-4 fw-bold mb-1">載入中...</h1>
+        <div id="currentSkaterOrg" class="opacity-75 fs-5">單位讀取中</div>
+      </div>
+      
+      <div class="card-body p-4">
+        <div class="row g-3">
+          <div class="col-6">
+            <label class="input-label text-center">技術分 (Tech)</label>
+            <input type="number" id="tech" class="form-control score-input" step="0.5" inputmode="decimal" pattern="[0-9.]*" placeholder="0" onkeydown="handleEnter(event, 'art')">
+          </div>
+          <div class="col-6">
+            <label class="input-label text-center">藝術分 (Art)</label>
+            <input type="number" id="art" class="form-control score-input" step="0.5" inputmode="decimal" pattern="[0-9.]*" placeholder="0" onkeydown="handleEnter(event, 'saveBtn')">
+          </div>
+        </div>
+        
+        <div class="penalty-section">
+          <div class="row align-items-center">
+            <div class="col-7 text-end fw-bold text-danger">
+              額外扣除罰分 (Penalty)
+              <div id="penaltyAlert" class="small text-success d-none mt-1" style="font-size: 0.8rem;">🔄 已同步罰分</div>
+            </div>
+            <div class="col-5">
+              <input type="number" id="penalty" class="form-control score-input penalty-input" step="0.5" inputmode="decimal" pattern="[0-9.]*" value="0">
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-4 d-flex justify-content-between">
+          <button class="btn btn-outline-secondary btn-nav w-25" onclick="prevSkater()">上一位</button>
+          <button id="saveBtn" class="btn btn-primary btn-nav w-70 shadow" onclick="saveAndNext()">儲存 / 下一位</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="api.js"></script>
+  <script>
+    let skaters = [], existingScores = {}, currentIndex = 0, context = {};
+
+    function handleEnter(e, nextAction) {
+      if (e.key === 'Enter' || e.keyCode === 13) {
+        e.preventDefault();
+        if (nextAction === 'saveBtn') saveAndNext();
+        else document.getElementById(nextAction).focus();
+      }
+    }
+
+    window.onload = async () => {
+      try {
+        const res = await apiGet('getAllCompetitions');
+        const select = document.getElementById('compSelect');
+        select.innerHTML = '<option value="">-- 請選擇比賽 --</option>';
+        if (res.status === 'success' && res.data.length > 0) {
+          res.data.forEach(name => select.appendChild(new Option(name, name)));
+        } else {
+          select.innerHTML = '<option value="">(目前無比賽資料)</option>';
+        }
+      } catch (e) { alert("連線失敗：" + e.message); }
+    };
+
+    async function loadCategories() {
+      const compName = document.getElementById('compSelect').value;
+      const catSelect = document.getElementById('catSelect');
+      if (!compName) { catSelect.disabled = true; catSelect.innerHTML = '<option value="">-- 請先選擇賽事 --</option>'; return; }
+      
+      catSelect.innerHTML = '<option>載入中...</option>';
+      try {
+        const res = await apiGet('getCategoriesByComp', { comp: compName });
+        catSelect.innerHTML = '<option value="">-- 請選擇組別 --</option>';
+        if (res.status === 'success') res.data.forEach(name => catSelect.appendChild(new Option(name, name)));
+        catSelect.disabled = false;
+      } catch (e) { catSelect.innerHTML = '<option value="">讀取失敗</option>'; }
+    }
+
+    function checkEntryReady() { document.getElementById('entryBtn').disabled = !document.getElementById('catSelect').value; }
+
+    async function startScoring() {
+      context = { comp: document.getElementById('compSelect').value, cat: document.getElementById('catSelect').value, judge: document.getElementById('judgeId').value };
+      const btn = document.getElementById('entryBtn');
+      btn.disabled = true; btn.innerText = "載入中...";
+
+      try {
+        const res = await apiGet('getCategoryData', { comp: context.comp, cat: context.cat, judgeId: context.judge });
+        if(res.status === 'success') {
+          skaters = res.skaters;
+          existingScores = res.existingScores || {};
+          
+          const jumpSelect = document.getElementById('jumpSelect');
+          jumpSelect.innerHTML = '';
+          skaters.forEach((sk, idx) => jumpSelect.appendChild(new Option(`S${idx + 1}: ${sk.name}`, idx)));
+
+          document.getElementById('setupView').classList.add('d-none');
+          document.getElementById('scoringView').classList.remove('d-none');
+          updateSkaterUI();
+        } else { alert("讀取失敗！"); btn.disabled = false; }
+      } catch (e) { alert("連線錯誤：" + e.message); btn.disabled = false; }
+    }
+
+    function jumpToSkater() { currentIndex = parseInt(document.getElementById('jumpSelect').value); updateSkaterUI(); }
+
+    async function updateSkaterUI() {
+      const skater = skaters[currentIndex];
+      document.getElementById('currentSkaterNum').innerText = `選手 ${currentIndex + 1} / ${skaters.length}`;
+      document.getElementById('currentSkaterName').innerText = skater.name;
+      document.getElementById('currentSkaterOrg').innerText = skater.org || "無單位資訊";
+      document.getElementById('jumpSelect').value = currentIndex;
+      
+      const penaltyInput = document.getElementById('penalty');
+      const penaltyAlert = document.getElementById('penaltyAlert');
+      penaltyAlert.classList.add('d-none');
+
+      const prevScore = existingScores[skater.id];
+      if (prevScore) {
+        document.getElementById('tech').value = prevScore.tech !== undefined ? prevScore.tech : '';
+        document.getElementById('art').value = prevScore.art !== undefined ? prevScore.art : '';
+        penaltyInput.value = prevScore.penalty !== undefined ? prevScore.penalty : '0';
+      } else {
+        document.getElementById('tech').value = '';
+        document.getElementById('art').value = '';
+        penaltyInput.value = '0';
+        
+        try {
+          const res = await apiGet('getSkaterPenalty', { comp: context.comp, cat: context.cat, skaterId: skater.id });
+          const syncedPenalty = res.data || 0;
+          if (syncedPenalty > 0 && penaltyInput.value === '0') {
+            penaltyInput.value = syncedPenalty;
+            penaltyAlert.classList.remove('d-none');
+          }
+        } catch(e) {} // 忽略背景錯誤
+      }
+      
+      window.scrollTo(0, 0);
+      setTimeout(() => { document.getElementById('tech').focus(); }, 100);
+    }
+
+    async function saveAndNext() {
+      const tech = document.getElementById('tech').value;
+      const art = document.getElementById('art').value;
+      const penalty = document.getElementById('penalty').value;
+
+      if (!tech || !art) {
+        alert("請輸入完整分數！");
+        if (!tech) document.getElementById('tech').focus();
+        else if (!art) document.getElementById('art').focus();
+        return;
+      }
+
+      const btn = document.getElementById('saveBtn');
+      btn.disabled = true; btn.innerText = "儲存中...";
+      existingScores[skaters[currentIndex].id] = { tech, art, penalty };
+
+      try {
+        const res = await apiPost('saveScore', { comp: context.comp, cat: context.cat, judgeId: context.judge, skaterId: skaters[currentIndex].id, scoreData: { tech, art, penalty } });
+        if (res.status === 'error') { alert("儲存失敗：\n" + res.log); return; }
+        
+        if (currentIndex < skaters.length - 1) {
+          currentIndex++; updateSkaterUI();
+        } else {
+          alert("🏆 恭喜！本組所有選手已評分完畢。");
+        }
+      } catch (err) {
+        alert("儲存連線失敗：" + err.message);
+      } finally {
+        btn.disabled = false; btn.innerText = "儲存 / 下一位";
+      }
+    }
+
+    function prevSkater() { if (currentIndex > 0) { currentIndex--; updateSkaterUI(); } }
+  </script>
+</body>
+</html>
