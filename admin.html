@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Freestyle Slalom 賽事管理系統</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background-color: #f0f2f5; font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif; }
+    .main-card { max-width: 700px; margin: 30px auto; border: none; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); }
+    .header-section { background: linear-gradient(135deg, #1a2a6c, #b21f1f); color: white; padding: 30px; border-radius: 16px 16px 0 0; position: relative; }
+    .btn-back { position: absolute; top: 15px; left: 15px; background: rgba(255,255,255,0.2); border: none; color: white; }
+    .form-label { color: #444; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card main-card">
+      <div class="header-section text-center">
+        <button class="btn btn-sm btn-back" onclick="window.location.href='index.html'">🔙 回首頁</button>
+        <h3 class="mb-1 fw-bold">⚙️ 賽事管理系統</h3>
+        <p class="mb-0 opacity-75">快速導入報名名單與組別設定</p>
+      </div>
+      <div class="card-body p-4 p-md-5">
+        <div class="row">
+          <div class="col-md-7 mb-3">
+            <label class="form-label">比賽名稱</label>
+            <input type="text" id="compName" class="form-control" placeholder="例如：115年總統盃">
+          </div>
+          <div class="col-md-5 mb-3">
+            <label class="form-label">組別名稱</label>
+            <input type="text" id="categoryName" class="form-control" placeholder="例如：國中女子組">
+          </div>
+        </div>
+        
+        <div class="mb-4">
+          <label class="form-label">貼上報名名單 (三行一組)</label>
+          <textarea id="rawList" class="form-control" rows="8" placeholder="0611&#10;黃煒書&#10;新北市立莒光國小..."></textarea>
+        </div>
+        
+        <div class="d-grid">
+          <button id="submitBtn" class="btn btn-primary btn-lg shadow-sm fw-bold" onclick="submitData()">
+            確認匯入組別名單
+          </button>
+        </div>
+
+        <div id="status" class="mt-4"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="api.js"></script>
+  <script>
+    async function submitData() {
+      const btn = document.getElementById('submitBtn');
+      const name = document.getElementById('compName').value.trim();
+      const cat = document.getElementById('categoryName').value.trim();
+      const list = document.getElementById('rawList').value.trim();
+      const statusDiv = document.getElementById('status');
+      
+      if (!name || !cat || !list) {
+        alert("所有欄位均為必填！"); return;
+      }
+
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> 正在儲存至雲端...';
+      statusDiv.innerHTML = '';
+
+      try {
+        // 使用 api.js 的 apiPost
+        const res = await apiPost('setupCompetition', { comp: name, cat: cat, rawList: list });
+        
+        if (res.status === "success") {
+          statusDiv.innerHTML = `
+            <div class="alert alert-success border-0 shadow-sm">
+              <strong>匯入成功！</strong><br>
+              賽事：${name}<br>組別：${cat}<br>選手人數：${res.count} 人
+            </div>`;
+          document.getElementById('rawList').value = '';
+          document.getElementById('categoryName').value = '';
+        } else {
+          statusDiv.innerHTML = `<div class="alert alert-danger">錯誤：${res.log}</div>`;
+        }
+      } catch (err) {
+        statusDiv.innerHTML = `<div class="alert alert-danger">網路連線異常：${err.message}</div>`;
+      } finally {
+        btn.disabled = false;
+        btn.innerText = "確認匯入組別名單";
+      }
+    }
+  </script>
+</body>
+</html>
