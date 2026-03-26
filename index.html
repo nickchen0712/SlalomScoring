@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Freestyle Slalom 賽事系統入口</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background-color: #f4f7f6; font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+    .portal-card { max-width: 600px; width: 100%; border: none; border-radius: 20px; box-shadow: 0 15px 35px rgba(0,0,0,0.1); padding: 40px 30px; background: white; text-align: center; }
+    .logo-area { font-size: 3rem; margin-bottom: 20px; }
+    .btn-portal { padding: 20px; font-size: 1.2rem; font-weight: bold; border-radius: 15px; margin-bottom: 20px; transition: transform 0.2s; }
+    .btn-portal:hover { transform: translateY(-3px); }
+    .btn-admin { background: linear-gradient(135deg, #1a2a6c, #b21f1f); color: white; }
+    .btn-judge { background: linear-gradient(135deg, #0d6efd, #0dcaf0); color: white; }
+    .btn-result { background: linear-gradient(135deg, #198754, #20c997); color: white; }
+  </style>
+</head>
+<body>
+
+  <div class="portal-card">
+    <div class="logo-area">⛸️</div>
+    <h2 class="fw-bold mb-4">Freestyle Slalom<br>賽事管理系統群</h2>
+    <p class="text-muted mb-5">請選擇您要進入的系統模組，部分系統需輸入通行碼。</p>
+
+    <div class="d-grid gap-3">
+      <button class="btn btn-portal btn-admin shadow" onclick="checkAccess('admin.html', 'admin2026')">
+        ⚙️ Freestyle Slalom 賽事管理系統
+      </button>
+
+      <button class="btn btn-portal btn-judge shadow" onclick="checkAccess('judge.html', 'judge2026')">
+        📋 Freestyle Slalom 裁判評分登錄系統
+      </button>
+
+      <button class="btn btn-portal btn-result shadow" onclick="window.location.href='result.html'">
+        🏆 Freestyle Slalom 賽事成績版
+      </button>
+    </div>
+  </div>
+
+  <script>
+    function checkAccess(targetUrl, correctPassword) {
+      const input = prompt("請輸入系統通行碼：");
+      if (input === null) return; // 取消
+      
+      if (input === correctPassword) {
+        window.location.href = targetUrl;
+      } else {
+        alert("❌ 通行碼錯誤，無法進入！");
+      }
+    }
+  </script>
+</body>
+</html>
