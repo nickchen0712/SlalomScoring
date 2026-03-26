@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Freestyle Slalom 賽事成績版</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background-color: #f8f9fa; font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif; }
+    .header-box { background: linear-gradient(135deg, #198754, #20c997); color: white; padding: 25px; border-radius: 15px; margin-top: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); position: relative; }
+    .btn-back { position: absolute; top: 15px; left: 15px; background: rgba(0,0,0,0.2); border: none; color: white; }
+    .table-container { background: white; padding: 25px; border-radius: 15px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); margin-bottom: 30px; overflow-x: auto; border-top: 5px solid #0d6efd; }
+    th { background-color: #f1f3f5 !important; text-align: center; vertical-align: middle; white-space: nowrap; font-size: 0.95rem; color: #495057; }
+    td { text-align: center; vertical-align: middle; }
+    .rank-col { font-size: 1.5rem; font-weight: 900; color: #dc3545; background-color: #fff5f5 !important; }
+    .vp-col { font-weight: 900; color: #0d6efd; font-size: 1.2rem; }
+    .matrix-win { font-weight: bold; color: #0d6efd; font-size: 1.1rem; }
+    .matrix-loss { color: #adb5bd; font-size: 1.1rem; }
+    .section-title { font-weight: 800; color: #212529; margin-bottom: 15px; display: flex; align-items: center; }
+    .section-title span { background: #0d6efd; color: white; padding: 2px 10px; border-radius: 5px; margin-right: 10px; font-size: 1rem; }
+    .score-detail { font-size: 0.8rem; color: #6c757d; }
+    .score-total { font-size: 1.1rem; font-weight: bold; color: #212529; }
+  </style>
+</head>
+<body class="p-3">
+
+  <div class="container-fluid" style="max-width: 1500px;">
+    <div class="header-box text-center">
+      <button class="btn btn-sm btn-back" onclick="window.location.href='index.html'">🔙 首頁</button>
+      <h2 class="mb-3 fw-bold">🏆 WSSA 賽事成績板 (Table 1 ~ 3)</h2>
+      <div class="row justify-content-center g-3">
+        <div class="col-md-4">
+          <select id="compSelect" class="form-select form-select-lg" onchange="loadCategories()">
+            <option value="">-- 讀取賽事中... --</option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <select id="catSelect" class="form-select form-select-lg" disabled onchange="checkCalcReady()">
+            <option value="">-- 請先選擇賽事 --</option>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <button id="calcBtn" class="btn btn-warning w-100 btn-lg fw-bold" onclick="fetchAndCalculate()" disabled>
+            產生完整成績表
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div id="resultArea" class="d-none mt-4">
+      <div class="table-container">
+        <h4 class="section-title"><span>Table 1</span> 裁判原始分數 (Raw Scores) - 依出場順序</h4>
+        <div class="table-responsive"><table class="table table-bordered table-hover align-middle"><thead id="t1Head"></thead><tbody id="t1Body"></tbody></table></div>
+      </div>
+      
+      <div class="table-container" style="border-top-color: #198754;">
+        <h4 class="section-title"><span style="background: #198754;">Table 2</span> 裁判名次表 (Local Rankings) - 依出場順序</h4>
+        <div class="table-responsive"><table class="table table-bordered table-hover align-middle"><thead id="t2Head"></thead><tbody id="t2Body"></tbody></table></div>
+      </div>
+
+      <div class="table-container" style="border-top-color: #dc3545;">
+        <h4 class="section-title"><span style="background: #dc3545;">Table 3</span> 對戰矩陣與最終結算 (VP Matrix) - 依最終名次</h4>
+        <div class="alert alert-light border small mb-3">
+          <strong>🏆 判定順序：</strong> 
+          <span class="text-primary fw-bold">C1 (總勝場數)</span> ➔ <span class="text-primary fw-bold">C2 (內戰得票數和)</span> ➔ 
+          <span class="text-primary fw-bold">C3 (技術分和)</span> ➔ <span class="text-primary fw-bold">C4 (總得票數)</span> ➔ 
+          <span class="text-primary fw-bold">C5 (總分和)</span>
+        </div>
+        <div class="table-responsive"><table class="table table-bordered table-hover align-middle"><thead id="t3Head"></thead><tbody id="t3Body"></tbody></table></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="api.js"></script>
+  <script>
+    window.onload = async () => {
+      try {
+        const res = await apiGet('getAllCompetitions');
+        const select = document.getElementById('compSelect');
+        select.innerHTML = '<option value="">-- 選擇比賽 --</option>';
+        if (res.status === 'success') res.data.forEach(name => select.add(new Option(name, name)));
+      } catch(e) { alert("連線失敗：" + e.message); }
+    };
+
+    async function loadCategories() {
+      const compName = document.getElementById('compSelect').value;
+      const catSelect = document.getElementById('catSelect');
+      if (!compName) { catSelect.disabled = true; return; }
+      
+      catSelect.innerHTML = '<option>載入中...</option>';
+      try {
+        const res = await apiGet('getCategoriesByComp', { comp: compName });
+        catSelect.innerHTML = '<option value="">-- 選擇組別 --</option>';
+        if (res.status === 'success') res.data.forEach(name => catSelect.add(new Option(name, name)));
+        catSelect.disabled = false;
+      } catch(e) {}
+    }
+
+    function checkCalcReady() { document.getElementById('calcBtn').disabled = !document.getElementById('catSelect').value; }
+
+    async function fetchAndCalculate() {
+      const comp = document.getElementById('compSelect').value;
+      const cat = document.getElementById('catSelect').value;
+      const btn = document.getElementById('calcBtn');
+      btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> 運算中...';
+
+      try {
+        const res = await apiGet('getResultsData', { comp, cat });
+        if(res.status === 'success') {
+          processVP(res.skaters, res.scores, comp, cat);
+        } else { alert("讀取失敗：" + res.msg); }
+      } catch(e) { alert("連線失敗：" + e.message); } finally {
+        btn.disabled = false; btn.innerText = "更新成績表";
+      }
+    }
+
+    // --- (以下 processVP 與 renderTable1, 2, 3 的核心邏輯完全照舊，沒有任何改動) ---
+    function processVP(skaters, rawScores, compName, catName) {
+      let judges = Array.from(new Set(rawScores.map(s => s.judgeId))).sort((a, b) => {
+          let numA = parseInt(a.replace(/\D/g, '')) || 0; let numB = parseInt(b.replace(/\D/g, '')) || 0;
+          return numA - numB || a.localeCompare(b);
+      });
+      if (judges.length === 0) return alert("該組別目前還沒有任何裁判成績！");
+
+      let stats = {};
+      skaters.forEach((sk, idx) => {
+        stats[sk.id] = { ...sk, startNum: idx + 1, localRankings: {}, rawVotes: {}, rawScores: {}, c1: 0, c2: 0, c3: 0, c4: 0, c5: 0 };
+      });
+
+      judges.forEach(jId => {
+        let jScores = skaters.map(sk => {
+          let s = rawScores.find(rs => rs.judgeId === jId && rs.skaterId === sk.id) || {total:0, art:0, tech:0, penalty:0};
+          stats[sk.id].rawScores[jId] = s;
+          return { id: sk.id, total: s.total, art: s.art, tech: s.tech, cmpTotal: Math.round(s.total * 100) };
+        });
+
+        jScores.sort((a, b) => b.cmpTotal - a.cmpTotal);
+
+        jScores.forEach((s, index) => {
+          let rank = index + 1;
+          if (index > 0) {
+            let prev = jScores[index - 1];
+            if (prev.cmpTotal === s.cmpTotal) rank = stats[prev.id].localRankings[jId];
+          }
+          stats[s.id].localRankings[jId] = rank;
+          stats[s.id].c3 += s.tech; stats[s.id].c5 += s.total;
+        });
+      });
+
+      const winThreshold = judges.length / 2;
+      skaters.forEach(a => {
+        skaters.forEach(b => {
+          if (a.id === b.id) return;
+          let aWins = 0;
+          judges.forEach(jId => {
+            let rankA = stats[a.id].localRankings[jId] || 999; let rankB = stats[b.id].localRankings[jId] || 999;
+            if (rankA < rankB) aWins += 1; else if (rankA === rankB) aWins += 0.5;
+          });
+          stats[a.id].rawVotes[b.id] = aWins; stats[a.id].c4 += aWins;
+          if (aWins > winThreshold) stats[a.id].c1 += 1;
+        });
+      });
+
+      let finalRanked = [];
+      let currentGroup = skaters.map(sk => sk.id);
+      currentGroup.sort((a, b) => stats[b].c1 - stats[a].c1);
+      let c1Groups = groupByFn(currentGroup, id => stats[id].c1);
+
+      c1Groups.forEach(g1 => {
+        if (g1.length === 1) {
+          stats[g1[0]].c2 = '-'; finalRanked.push(g1[0]);
+        } else {
+          g1.forEach(a => {
+            stats[a].c2 = 0;
+            g1.forEach(b => { if (a !== b) stats[a].c2 += stats[a].rawVotes[b]; });
+          });
+          
+          g1.sort((a, b) => {
+            if (stats[b].c2 !== stats[a].c2) return stats[b].c2 - stats[a].c2;
+            let c3Diff = Math.round(stats[b].c3 * 100) - Math.round(stats[a].c3 * 100);
+            if (c3Diff !== 0) return c3Diff;
+            if (stats[b].c4 !== stats[a].c4) return stats[b].c4 - stats[a].c4;
+            return Math.round(stats[b].c5 * 100) - Math.round(stats[a].c5 * 100);
+          });
+          finalRanked.push(...g1);
+        }
+      });
+
+      let finalResults = finalRanked.map((id, index) => {
+        let r = { id: id, place: index + 1 };
+        if (index > 0) {
+          let prevId = finalRanked[index - 1];
+          if (stats[id].c1 === stats[prevId].c1 && stats[id].c2 === stats[prevId].c2 && 
+              Math.round(stats[id].c3 * 100) === Math.round(stats[prevId].c3 * 100) && 
+              stats[id].c4 === stats[prevId].c4 && Math.round(stats[id].c5 * 100) === Math.round(stats[prevId].c5 * 100)) {
+            r.place = finalResults[index - 1].place;
+          }
+        }
+        return r;
+      });
+
+      renderTable1(skaters, stats, judges); renderTable2(skaters, stats, judges); renderTable3(finalResults, stats, judges);
+      document.getElementById('resultArea').classList.remove('d-none');
+    }
+
+    function groupByFn(array, fn) {
+      if(array.length === 0) return [];
+      let groups = [], currentGroup = [array[0]];
+      for(let i=1; i<array.length; i++) {
+        if(fn(array[i]) === fn(array[i-1])) currentGroup.push(array[i]);
+        else { groups.push(currentGroup); currentGroup = [array[i]]; }
+      }
+      groups.push(currentGroup); return groups;
+    }
+
+    function renderTable1(skaters, stats, judges) {
+      let headHTML = `<tr><th width="15%" class="text-start">選手姓名</th>`;
+      judges.forEach(j => { headHTML += `<th>${j} 分數</th>`; }); headHTML += `</tr>`;
+      document.getElementById('t1Head').innerHTML = headHTML;
+
+      let bodyHTML = '';
+      skaters.forEach(sk => {
+        let st = stats[sk.id];
+        bodyHTML += `<tr><td class="fw-bold text-start text-nowrap">S${st.startNum}: ${st.name}</td>`;
+        judges.forEach(jId => {
+          let score = st.rawScores[jId] || {total:0, tech:0, art:0, penalty:0};
+          bodyHTML += `<td><div class="score-total text-primary">${score.total.toFixed(1)}</div><div class="score-detail">T:${score.tech} | A:${score.art} | P:${score.penalty}</div></td>`;
+        });
+        bodyHTML += `</tr>`;
+      });
+      document.getElementById('t1Body').innerHTML = bodyHTML;
+    }
+
+    function renderTable2(skaters, stats, judges) {
+      let headHTML = `<tr><th width="15%" class="text-start">選手姓名</th>`;
+      judges.forEach(j => { headHTML += `<th>${j} 名次</th>`; }); headHTML += `</tr>`;
+      document.getElementById('t2Head').innerHTML = headHTML;
+
+      let bodyHTML = '';
+      skaters.forEach(sk => {
+        let st = stats[sk.id];
+        bodyHTML += `<tr><td class="fw-bold text-start text-nowrap">S${st.startNum}: ${st.name}</td>`;
+        judges.forEach(jId => { bodyHTML += `<td class="fs-5 fw-bold text-secondary">${st.localRankings[jId] || '-'}</td>`; });
+        bodyHTML += `</tr>`;
+      });
+      document.getElementById('t2Body').innerHTML = bodyHTML;
+    }
+
+    function renderTable3(finalRanked, stats, judges) {
+      const winThreshold = judges.length / 2;
+      let headHTML = `<tr><th class="text-start">選手姓名</th>`;
+      finalRanked.forEach(r => { headHTML += `<th>vs S${stats[r.id].startNum}</th>`; });
+      headHTML += `<th class="bg-primary text-white">C1<br><small>Win Sum</small></th><th class="bg-secondary text-white">C2<br><small>Local WP</small></th><th class="bg-light">C3<br><small>Tech Sum</small></th><th class="bg-light">C4<br><small>Win Pts</small></th><th class="bg-light">C5<br><small>Total Marks</small></th><th class="bg-danger text-white fs-6" style="min-width: 80px;">最終排名<br><small>Rank</small></th></tr>`;
+      document.getElementById('t3Head').innerHTML = headHTML;
+
+      let bodyHTML = '';
+      finalRanked.forEach((r) => {
+        let st = stats[r.id];
+        bodyHTML += `<tr><td class="fw-bold text-start text-nowrap">S${st.startNum}: ${st.name}</td>`;
+        finalRanked.forEach((colR) => {
+          if (r.id === colR.id) {
+            bodyHTML += `<td class="bg-light text-muted">-</td>`;
+          } else {
+            let rv = st.rawVotes[colR.id]; let isWin = rv > winThreshold;
+            bodyHTML += `<td class="${isWin ? "matrix-win" : "matrix-loss"}">${rv}</td>`;
+          }
+        });
+        bodyHTML += `<td class="vp-col">${st.c1}</td><td class="fw-bold text-secondary">${st.c2}</td><td class="text-muted">${st.c3.toFixed(1)}</td><td class="text-muted">${st.c4}</td><td class="text-muted">${st.c5.toFixed(1)}</td><td class="rank-col">${r.place}</td></tr>`;
+      });
+      document.getElementById('t3Body').innerHTML = bodyHTML;
+    }
+  </script>
+</body>
+</html>
