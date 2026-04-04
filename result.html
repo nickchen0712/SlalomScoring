@@ -26,6 +26,7 @@
     .rank-col { font-size: 1.3rem; font-weight: 900; color: #dc3545; background-color: #fff5f5 !important; }
     .vp-col { font-weight: 900; color: #0d6efd; font-size: 1.2rem; }
     .matrix-win { font-weight: bold; color: #0d6efd; }
+    .matrix-tie { font-weight: bold; color: #198754; } /* 新增：平手顯示綠色 */
     .matrix-loss { color: #adb5bd; }
     
     .section-title { font-weight: 800; color: #212529; margin-bottom: 15px; display: flex; align-items: center; font-size: 1.2rem; }
@@ -78,7 +79,7 @@
         <h4 class="section-title"><span style="background: #dc3545;">Table 3</span> 對戰矩陣與最終結算 (VP Matrix)</h4>
         <div class="alert alert-light border small mb-2 py-2">
           <strong>🏆 判定順序：</strong> 
-          <span class="text-primary fw-bold">C1 (總勝場)</span> ➔ <span class="text-primary fw-bold">C2 (內戰得票)</span> ➔ 
+          <span class="text-primary fw-bold">C1 (總得勝分)</span> ➔ <span class="text-primary fw-bold">C2 (內戰得票)</span> ➔ 
           <span class="text-primary fw-bold">C3 (技術分和)</span> ➔ <span class="text-primary fw-bold">C4 (總得票)</span> ➔ <span class="text-primary fw-bold">C5 (總分和)</span>
         </div>
         <div class="table-responsive">
@@ -132,7 +133,7 @@
     }
 
     // ==========================================
-    // 核心演算法 (維持不變)
+    // 核心演算法
     // ==========================================
     function processVP(skaters, rawScores, compName, catName) {
       let judges = Array.from(new Set(rawScores.map(s => s.judgeId))).sort((a, b) => {
@@ -175,8 +176,16 @@
             let rankA = stats[a.id].localRankings[jId] || 999; let rankB = stats[b.id].localRankings[jId] || 999;
             if (rankA < rankB) aWins += 1; else if (rankA === rankB) aWins += 0.5;
           });
-          stats[a.id].rawVotes[b.id] = aWins; stats[a.id].c4 += aWins;
-          if (aWins > winThreshold) stats[a.id].c1 += 1;
+          
+          stats[a.id].rawVotes[b.id] = aWins; 
+          stats[a.id].c4 += aWins;
+          
+          // 【更新核心】：超過半數得 1 分，剛好一半平手得 0.5 分
+          if (aWins > winThreshold) {
+            stats[a.id].c1 += 1;
+          } else if (aWins === winThreshold) {
+            stats[a.id].c1 += 0.5;
+          }
         });
       });
 
@@ -232,9 +241,6 @@
       groups.push(currentGroup); return groups;
     }
 
-    // ==========================================
-    // Table 1 渲染 (加入 sticky-left)
-    // ==========================================
     function renderTable1(skaters, stats, judges) {
       let headHTML = `<tr><th class="text-start sticky-left" style="min-width: 140px;">選手姓名</th>`;
       judges.forEach(j => { headHTML += `<th>${j} 分數</th>`; }); headHTML += `</tr>`;
@@ -253,9 +259,6 @@
       document.getElementById('t1Body').innerHTML = bodyHTML;
     }
 
-    // ==========================================
-    // Table 2 渲染 (加入 sticky-left)
-    // ==========================================
     function renderTable2(skaters, stats, judges) {
       let headHTML = `<tr><th class="text-start sticky-left" style="min-width: 140px;">選手姓名</th>`;
       judges.forEach(j => { headHTML += `<th>${j}</th>`; }); headHTML += `</tr>`;
@@ -271,20 +274,14 @@
       document.getElementById('t2Body').innerHTML = bodyHTML;
     }
 
-    // ==========================================
-    // Table 3 渲染 (極致壓縮版)
-    // ==========================================
     function renderTable3(finalRanked, stats, judges) {
       const winThreshold = judges.length / 2;
-      // 表頭：選手姓名凍結
       let headHTML = `<tr><th class="text-start sticky-left" style="min-width: 140px;">選手姓名</th>`;
-      
-      // 表頭：對戰矩陣 (拿掉 vs 字樣，大幅縮小寬度)
       finalRanked.forEach(r => { headHTML += `<th class="matrix-cell text-muted">S${stats[r.id].startNum}</th>`; });
       
-      // 表頭：C1 ~ C5 標題極致縮小
+      // 表頭名稱更新為「總得勝分」
       headHTML += `
-        <th class="bg-primary text-white crit-cell">C1<br><small style="font-size:0.7em">WinSum</small></th>
+        <th class="bg-primary text-white crit-cell">C1<br><small style="font-size:0.7em">總得勝分</small></th>
         <th class="bg-secondary text-white crit-cell">C2<br><small style="font-size:0.7em">LocalWP</small></th>
         <th class="bg-light crit-cell">C3<br><small style="font-size:0.7em">TechSum</small></th>
         <th class="bg-light crit-cell">C4<br><small style="font-size:0.7em">WinPts</small></th>
@@ -296,20 +293,22 @@
       let bodyHTML = '';
       finalRanked.forEach((r) => {
         let st = stats[r.id];
-        // 身體：選手姓名凍結
         bodyHTML += `<tr><td class="fw-bold text-start text-nowrap sticky-left">S${st.startNum}: ${st.name}</td>`;
         
-        // 身體：對戰矩陣
         finalRanked.forEach((colR) => {
           if (r.id === colR.id) {
             bodyHTML += `<td class="bg-light text-muted matrix-cell">-</td>`;
           } else {
-            let rv = st.rawVotes[colR.id]; let isWin = rv > winThreshold;
-            bodyHTML += `<td class="matrix-cell ${isWin ? "matrix-win" : "matrix-loss"}">${rv}</td>`;
+            let rv = st.rawVotes[colR.id]; 
+            let isWin = rv > winThreshold;
+            let isTie = rv === winThreshold;
+            // 新增：如果剛好等於門檻（平手），給予專屬的樣式
+            let cellClass = isWin ? "matrix-win" : (isTie ? "matrix-tie" : "matrix-loss");
+            bodyHTML += `<td class="matrix-cell ${cellClass}">${rv}</td>`;
           }
         });
 
-        // 身體：結算欄位
+        // 結算數值
         bodyHTML += `
           <td class="vp-col crit-cell">${st.c1}</td>
           <td class="fw-bold text-secondary crit-cell">${st.c2}</td>
