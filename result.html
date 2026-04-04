@@ -11,22 +11,19 @@
     .btn-back { position: absolute; top: 15px; left: 15px; background: rgba(0,0,0,0.2); border: none; color: white; }
     .table-container { background: white; padding: 15px; border-radius: 15px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); margin-bottom: 30px; overflow-x: auto; border-top: 5px solid #0d6efd; }
     
-    /* 緊湊表格設定 */
     .table-sm th, .table-sm td { padding: 0.4rem 0.3rem; vertical-align: middle; text-align: center; }
     th { background-color: #f1f3f5 !important; white-space: nowrap; font-size: 0.9rem; color: #495057; }
     
-    /* 凍結首欄 (選手姓名) 避免橫向捲動時迷失 */
     .sticky-left { position: sticky; left: 0; background-color: #fff !important; z-index: 2; border-right: 2px solid #dee2e6 !important; box-shadow: 2px 0 5px rgba(0,0,0,0.03); }
     th.sticky-left { background-color: #f1f3f5 !important; z-index: 3; }
     
-    /* 欄位寬度極致壓縮 */
     .matrix-cell { min-width: 35px; width: 35px; font-size: 1rem; padding: 0.2rem !important; }
     .crit-cell { min-width: 50px; font-size: 1rem; }
     
     .rank-col { font-size: 1.3rem; font-weight: 900; color: #dc3545; background-color: #fff5f5 !important; }
     .vp-col { font-weight: 900; color: #0d6efd; font-size: 1.2rem; }
     .matrix-win { font-weight: bold; color: #0d6efd; }
-    .matrix-tie { font-weight: bold; color: #198754; } /* 新增：平手顯示綠色 */
+    .matrix-tie { font-weight: bold; color: #198754; } 
     .matrix-loss { color: #adb5bd; }
     
     .section-title { font-weight: 800; color: #212529; margin-bottom: 15px; display: flex; align-items: center; font-size: 1.2rem; }
@@ -180,7 +177,6 @@
           stats[a.id].rawVotes[b.id] = aWins; 
           stats[a.id].c4 += aWins;
           
-          // 【更新核心】：超過半數得 1 分，剛好一半平手得 0.5 分
           if (aWins > winThreshold) {
             stats[a.id].c1 += 1;
           } else if (aWins === winThreshold) {
@@ -214,7 +210,9 @@
         }
       });
 
-      let finalResults = finalRanked.map((id, index) => {
+      // 【修正核心：解決初始化問題】改用陣列推入，避免 map 尚未完成就存取的錯誤
+      let finalResults = [];
+      finalRanked.forEach((id, index) => {
         let r = { id: id, place: index + 1 };
         if (index > 0) {
           let prevId = finalRanked[index - 1];
@@ -224,7 +222,7 @@
             r.place = finalResults[index - 1].place;
           }
         }
-        return r;
+        finalResults.push(r);
       });
 
       renderTable1(skaters, stats, judges); renderTable2(skaters, stats, judges); renderTable3(finalResults, stats, judges);
@@ -279,7 +277,6 @@
       let headHTML = `<tr><th class="text-start sticky-left" style="min-width: 140px;">選手姓名</th>`;
       finalRanked.forEach(r => { headHTML += `<th class="matrix-cell text-muted">S${stats[r.id].startNum}</th>`; });
       
-      // 表頭名稱更新為「總得勝分」
       headHTML += `
         <th class="bg-primary text-white crit-cell">C1<br><small style="font-size:0.7em">總得勝分</small></th>
         <th class="bg-secondary text-white crit-cell">C2<br><small style="font-size:0.7em">LocalWP</small></th>
@@ -302,13 +299,11 @@
             let rv = st.rawVotes[colR.id]; 
             let isWin = rv > winThreshold;
             let isTie = rv === winThreshold;
-            // 新增：如果剛好等於門檻（平手），給予專屬的樣式
             let cellClass = isWin ? "matrix-win" : (isTie ? "matrix-tie" : "matrix-loss");
             bodyHTML += `<td class="matrix-cell ${cellClass}">${rv}</td>`;
           }
         });
 
-        // 結算數值
         bodyHTML += `
           <td class="vp-col crit-cell">${st.c1}</td>
           <td class="fw-bold text-secondary crit-cell">${st.c2}</td>
