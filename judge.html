@@ -14,6 +14,7 @@
     .input-label { font-weight: bold; color: #495057; margin-top: 10px; display: block; font-size: 1.1rem; }
     .score-input { font-size: 2.5rem; text-align: center; font-weight: 800; color: #0d6efd; height: 80px; border-radius: 12px; transition: all 0.2s; }
     .score-input:focus { border-color: #0d6efd; box-shadow: 0 0 0 0.3rem rgba(13, 110, 253, 0.25); background-color: #f8fbff; }
+    .score-input:disabled { background-color: #e9ecef; opacity: 1; }
     .penalty-section { background-color: #fff5f5; border-radius: 12px; padding: 15px; margin-top: 25px; border: 1px dashed #dc3545; position: relative; }
     .penalty-input { font-size: 1.5rem; height: 50px; color: #dc3545 !important; }
     .btn-nav { padding: 15px 25px; font-weight: bold; border-radius: 12px; font-size: 1.2rem; }
@@ -63,8 +64,11 @@
     <div class="card score-card mx-auto">
       <div class="skater-info position-relative">
         <div class="d-flex justify-content-between align-items-center mb-2">
-          <div id="currentSkaterNum" class="badge bg-light text-dark px-3 py-2" style="font-size: 1rem;">選手 -- / --</div>
-          <select id="jumpSelect" class="form-select form-select-sm shadow-sm" style="width: 150px; font-weight: bold; cursor: pointer; color: #212529;" onchange="jumpToSkater()">
+          <div class="d-flex align-items-center gap-2">
+             <div id="currentSkaterNum" class="badge bg-light text-dark px-3 py-2" style="font-size: 1rem;">選手 -- / --</div>
+             <div id="memoryBadge" class="badge bg-warning text-dark d-none px-2 py-2 shadow-sm">🔄 歷史紀錄</div>
+          </div>
+          <select id="jumpSelect" class="form-select form-select-sm shadow-sm" style="width: 140px; font-weight: bold; cursor: pointer; color: #212529;" onchange="jumpToSkater()">
           </select>
         </div>
         <h1 id="currentSkaterName" class="display-4 fw-bold mb-1">載入中...</h1>
@@ -87,7 +91,7 @@
           <div class="row align-items-center">
             <div class="col-7 text-end fw-bold text-danger">
               額外扣除罰分 (Penalty)
-              <div id="penaltyAlert" class="small text-success d-none mt-1" style="font-size: 0.8rem;">🔄 已同步罰分</div>
+              <div id="penaltyAlert" class="small text-success d-none mt-1" style="font-size: 0.8rem;">🔄 已同步主審罰分</div>
             </div>
             <div class="col-5">
               <input type="number" id="penalty" class="form-control score-input penalty-input" step="0.5" inputmode="decimal" pattern="[0-9.]*" value="0">
@@ -175,19 +179,27 @@
       document.getElementById('currentSkaterOrg').innerText = skater.org || "無單位資訊";
       document.getElementById('jumpSelect').value = currentIndex;
       
+      const techInput = document.getElementById('tech');
+      const artInput = document.getElementById('art');
       const penaltyInput = document.getElementById('penalty');
       const penaltyAlert = document.getElementById('penaltyAlert');
+      const memoryBadge = document.getElementById('memoryBadge');
+      
       penaltyAlert.classList.add('d-none');
 
       const prevScore = existingScores[skater.id];
       if (prevScore) {
-        document.getElementById('tech').value = prevScore.tech !== undefined ? prevScore.tech : '';
-        document.getElementById('art').value = prevScore.art !== undefined ? prevScore.art : '';
+        // 有歷史紀錄，帶入舊分數並顯示黃色標籤
+        techInput.value = prevScore.tech !== undefined ? prevScore.tech : '';
+        artInput.value = prevScore.art !== undefined ? prevScore.art : '';
         penaltyInput.value = prevScore.penalty !== undefined ? prevScore.penalty : '0';
+        memoryBadge.classList.remove('d-none');
       } else {
-        document.getElementById('tech').value = '';
-        document.getElementById('art').value = '';
+        // 全新評分，強制徹底清空欄位
+        techInput.value = '';
+        artInput.value = '';
         penaltyInput.value = '0';
+        memoryBadge.classList.add('d-none');
         
         try {
           const res = await apiGet('getSkaterPenalty', { comp: context.comp, cat: context.cat, skaterId: skater.id });
@@ -196,27 +208,38 @@
             penaltyInput.value = syncedPenalty;
             penaltyAlert.classList.remove('d-none');
           }
-        } catch(e) {} // 忽略背景錯誤
+        } catch(e) {}
       }
       
       window.scrollTo(0, 0);
-      setTimeout(() => { document.getElementById('tech').focus(); }, 100);
+      setTimeout(() => { techInput.focus(); }, 100);
     }
 
     async function saveAndNext() {
-      const tech = document.getElementById('tech').value;
-      const art = document.getElementById('art').value;
-      const penalty = document.getElementById('penalty').value;
+      const techInput = document.getElementById('tech');
+      const artInput = document.getElementById('art');
+      const penaltyInput = document.getElementById('penalty');
+      
+      const tech = techInput.value;
+      const art = artInput.value;
+      const penalty = penaltyInput.value;
 
       if (!tech || !art) {
         alert("請輸入完整分數！");
-        if (!tech) document.getElementById('tech').focus();
-        else if (!art) document.getElementById('art').focus();
+        if (!tech) techInput.focus();
+        else artInput.focus();
         return;
       }
 
       const btn = document.getElementById('saveBtn');
-      btn.disabled = true; btn.innerText = "儲存中...";
+      btn.disabled = true; 
+      btn.innerText = "儲存中...";
+      
+      // 凍結輸入框，防止產生「視覺殘影」或重複輸入
+      techInput.disabled = true;
+      artInput.disabled = true;
+      penaltyInput.disabled = true;
+
       existingScores[skaters[currentIndex].id] = { tech, art, penalty };
 
       try {
@@ -224,14 +247,20 @@
         if (res.status === 'error') { alert("儲存失敗：\n" + res.log); return; }
         
         if (currentIndex < skaters.length - 1) {
-          currentIndex++; updateSkaterUI();
+          currentIndex++; 
+          updateSkaterUI();
         } else {
           alert("🏆 恭喜！本組所有選手已評分完畢。");
         }
       } catch (err) {
         alert("儲存連線失敗：" + err.message);
       } finally {
-        btn.disabled = false; btn.innerText = "儲存 / 下一位";
+        // 解除凍結狀態
+        btn.disabled = false; 
+        btn.innerText = "儲存 / 下一位";
+        techInput.disabled = false;
+        artInput.disabled = false;
+        penaltyInput.disabled = false;
       }
     }
 
